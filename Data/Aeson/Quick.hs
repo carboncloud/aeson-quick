@@ -28,8 +28,11 @@ import Data.Monoid
 import Data.String
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import qualified Data.Aeson.Key as AK
+import qualified Data.Aeson.KeyMap as AKM
 
 import GHC.Generics (Generic)
+import Data.Maybe (fromMaybe)
 
 data Structure = Obj [(T.Text, Bool, Structure)]
                | Arr Structure
@@ -54,7 +57,7 @@ instance Show Structure where
           showKey (':':xs) = "\\:" ++ showKey xs
           showKey (',':xs) = "\\," ++ showKey xs
           showKey (c:xs) = c : showKey xs
-    
+
 
 -- | Parse a structure, can fail
 parseStructure :: T.Text -> Either String Structure
@@ -133,9 +136,9 @@ extract structure = go structure >=> parseJSON
     go (Obj sx)   = withObject "" (forM sx . look) >=> pure . toJSON
     go (Arr s)    = withArray  "" (V.mapM $ go s)   >=> pure . Array
     go Val        = pure
-    look v (k,False,Val) = v .: k
-    look v (k,False,s)   = v .:  k >>= go s
-    look v (k,True,s)    = v .:? k >>= maybe (pure Null) (go s)
+    look v (k,False,Val) = v .:  AK.fromText k
+    look v (k,False,s)   = v .:  AK.fromText k >>= go s
+    look v (k,True,s)    = v .:? AK.fromText k >>= maybe (pure Null) (go s)
 
 
 {- |
@@ -167,7 +170,7 @@ build :: ToJSON a => Structure -> Value -> a -> Value
 build structure val = go structure val . toJSON
   where
     go (Val)      _          r         = r
-    go (Arr s)    (Array v)  (Array r) = Array $ V.zipWith (go s) v r 
+    go (Arr s)    (Array v)  (Array r) = Array $ V.zipWith (go s) v r
     go (Arr s)    Null       (Array r) = Array $ V.map (go s Null) r
     go (Arr s)    Null       r         = toJSON [go s Null r]
     go (Obj [ks]) (Object v) r         = Object $ update v ks r
@@ -178,8 +181,8 @@ build structure val = go structure val . toJSON
     go (Obj keys) (Object v) r         = r
     go a b c = error $ show (a,b,c) -- TODO
     update v (k,_,s) r =
-      let startVal = go s (H.lookupDefault Null k v) r
-       in H.insert k startVal v
+      let startVal = go s (fromMaybe Null $ AKM.lookup (AK.fromText k) v) r
+       in AKM.insert (AK.fromText k) startVal v
 
 
 -- $use

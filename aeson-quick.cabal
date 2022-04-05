@@ -19,7 +19,7 @@ Library
   Exposed-modules:    Data.Aeson.Quick
   hs-source-dirs:     .
   Build-Depends:      base                  >= 4      && <= 5
-                    , aeson
+                    , aeson                 >= 2.0.1
                     , attoparsec
                     , deepseq
                     , text
